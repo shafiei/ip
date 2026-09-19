@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IP Toolkit — your address, and the WHOIS behind any other</title>
+<meta name="description" content="See your own IP address and look up the registered owner, network range and abuse contact of any IPv4 or IPv6 address.">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:   #E8EDF1;
+    --panel:   #FFFFFF;
+    --ink:     #16202B;
+    --ink-dim: #5D6F80;
+    --line:    #C6D2DC;
+    --signal:  #1450E0;
+    --alert:   #A8431A;
+    --ok:      #1E7A54;
+    --radius: 3px;
+    --pad: clamp(1rem, 4vw, 2rem);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:   #0F161D;
+      --panel:   #17212B;
+      --ink:     #E3EBF2;
+      --ink-dim: #93A6B6;
+      --line:    #2B3B49;
+      --signal:  #79A4FF;
+      --alert:   #E59463;
+      --ok:      #63C79C;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  main { max-width: 62rem; margin: 0 auto; padding: var(--pad) var(--pad) 4rem; }
+
+  /* ---------- header ---------- */
+  header { padding-top: clamp(1.5rem, 5vw, 3rem); }
+  h1 {
+    font-size: clamp(1.5rem, 3.4vw, 2rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0 0 .35rem;
+  }
+  .lede { color: var(--ink-dim); margin: 0 0 2rem; max-width: 46ch; }
+
+  /* ---------- search ---------- */
+  form { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  input[type="text"] {
+    flex: 1 1 18rem;
+    min-width: 0;
+    padding: .7rem .8rem;
+    font: 500 1rem/1.3 "IBM Plex Mono", ui-monospace, monospace;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  input[type="text"]::placeholder { color: var(--ink-dim); font-weight: 400; }
+  button {
+    font: 500 1rem/1.3 "IBM Plex Sans", system-ui, sans-serif;
+    padding: .7rem 1.1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--signal);
+    background: var(--signal);
+    color: #fff;
+    cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) { button { color: #0F161D; } }
+  button.ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  button:hover { filter: brightness(1.08); }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  .hint { font-size: .85rem; color: var(--ink-dim); margin: 0 0 2rem; }
+  .hint code { font-family: "IBM Plex Mono", monospace; }
+
+  /* ---------- hero address ---------- */
+  .subject {
+    border-top: 2px solid var(--ink);
+    padding-top: 1rem;
+    margin-bottom: 2rem;
+  }
+  .subject .who { color: var(--ink-dim); font-size: .9rem; }
+  .address {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: clamp(1.75rem, 7vw, 3.25rem);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    word-break: break-all;
+    margin: .1rem 0 .6rem;
+  }
+  .subject-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .subject-actions button { font-size: .85rem; padding: .35rem .7rem; }
+
+  /* ---------- panels ---------- */
+  .panels { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+  @media (min-width: 46rem) { .panels { grid-template-columns: 1fr 1fr; } }
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem 1.2rem;
+  }
+  section.panel.wide { grid-column: 1 / -1; }
+  h2 {
+    font-size: .95rem;
+    font-weight: 600;
+    margin: 0 0 .9rem;
+    padding-bottom: .55rem;
+    border-bottom: 1px solid var(--line);
+  }
+  dl { margin: 0; display: grid; grid-template-columns: minmax(6.5rem, 9rem) 1fr; gap: .45rem .9rem; }
+  dt { color: var(--ink-dim); font-size: .9rem; }
+  dd {
+    margin: 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .92rem;
+    word-break: break-word;
+  }
+  dd a { color: var(--signal); }
+  .empty { color: var(--ink-dim); font-style: italic; font-family: "IBM Plex Sans", sans-serif; }
+
+  .note { font-size: .85rem; color: var(--ink-dim); margin: .9rem 0 0; }
+  .badge {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .75rem;
+    padding: .1rem .4rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--ink-dim);
+  }
+
+  /* ---------- states ---------- */
+  .msg {
+    border-left: 3px solid var(--alert);
+    background: var(--panel);
+    padding: .8rem 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: var(--radius);
+  }
+  .msg strong { display: block; }
+  .msg p { margin: .2rem 0 0; color: var(--ink-dim); font-size: .92rem; }
+  .skeleton {
+    display: inline-block;
+    width: 8rem; height: .85em;
+    background: var(--line);
+    border-radius: 2px;
+    opacity: .6;
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+  details { margin-top: 1.5rem; }
+  summary { cursor: pointer; color: var(--ink-dim); font-size: .9rem; }
+  pre {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .8rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem;
+    overflow-x: auto;
+    max-height: 26rem;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: .85rem;
+    color: var(--ink-dim);
+  }
+  footer a { color: var(--signal); }
+  .toast {
+    position: fixed;
+    left: 50%; bottom: 1.25rem;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--paper);
+    padding: .5rem .9rem;
+    border-radius: var(--radius);
+    font-size: .88rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>IP Toolkit</h1>
+    <p class="lede">Your own address is loaded below. Type any other IPv4 or IPv6 address to see who it is registered to, where it sits, and where to report abuse.</p>
+  </header>
+
+  <form id="form" autocomplete="off">
+    <label for="query" class="sr-only" hidden>IP address</label>
+    <input type="text" id="query" name="ip" placeholder="8.8.8.8 or 2001:4860:4860::8888" spellcheck="false" inputmode="text">
+    <button type="submit">Look up</button>
+    <button type="button" class="ghost" id="mine">Use my address</button>
+  </form>
+  <p class="hint">Registry data comes from RDAP, the current replacement for text WHOIS — it covers all five regional registries, not just APNIC.</p>
+
+  <div id="message" hidden></div>
+
+  <div class="subject">
+    <span class="who" id="subject-label">Your IP address</span>
+    <div class="address" id="address"><span class="skeleton"></span></div>
+    <div class="subject-actions">
+      <button type="button" class="ghost" id="copy-ip">Copy address</button>
+      <button type="button" class="ghost" id="copy-link">Copy link to this lookup</button>
+    </div>
+  </div>
+
+  <div class="panels">
+    <section class="panel">
+      <h2>Registration</h2>
+      <dl>
+        <dt>Network name</dt><dd id="r-name"><span class="skeleton"></span></dd>
+        <dt>Range</dt><dd id="r-range"><span class="skeleton"></span></dd>
+        <dt>CIDR</dt><dd id="r-cidr"><span class="skeleton"></span></dd>
+        <dt>Type</dt><dd id="r-type"><span class="skeleton"></span></dd>
+        <dt>Registry</dt><dd id="r-registry"><span class="skeleton"></span></dd>
+        <dt>Registered</dt><dd id="r-registered"><span class="skeleton"></span></dd>
+        <dt>Last changed</dt><dd id="r-changed"><span class="skeleton"></span></dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>Location and network</h2>
+      <dl>
+        <dt>Organisation</dt><dd id="g-org"><span class="skeleton"></span></dd>
+        <dt>ASN</dt><dd id="g-asn"><span class="skeleton"></span></dd>
+        <dt>City</dt><dd id="g-city"><span class="skeleton"></span></dd>
+        <dt>Region</dt><dd id="g-region"><span class="skeleton"></span></dd>
+        <dt>Country</dt><dd id="g-country"><span class="skeleton"></span></dd>
+        <dt>Time zone</dt><dd id="g-tz"><span class="skeleton"></span></dd>
+        <dt>Coordinates</dt><dd id="g-coords"><span class="skeleton"></span></dd>
+      </dl>
+      <p class="note">Geolocation is an estimate from the address block's registration, not a device location.</p>
+    </section>
+
+    <section class="panel wide">
+      <h2>Abuse reporting</h2>
+      <dl>
+        <dt>Contact</dt><dd id="a-name"><span class="skeleton"></span></dd>
+        <dt>Email</dt><dd id="a-email"><span class="skeleton"></span></dd>
+        <dt>Phone</dt><dd id="a-phone"><span class="skeleton"></span></dd>
+      </dl>
+      <p class="note">Send complaints to the abuse contact of the network that holds the address, with timestamps in UTC and the relevant log lines.</p>
+    </section>
+  </div>
+
+  <details>
+    <summary>Raw responses</summary>
+    <pre id="raw">Waiting for a lookup.</pre>
+  </details>
+
+  <footer>
+    <p>Built by <a href="https://www.github.com/shafiei">Shafiei</a>. Nothing is stored — every lookup runs in your browser against public APIs.</p>
+  </footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var raw = { geo: null, rdap: null };
+  var current = "";
+
+  /* ---------- helpers ---------- */
+
+  function set(id, value, opts) {
+    var el = $(id);
+    if (!el) return;
+    el.textContent = "";
+    if (value === undefined || value === null || value === "") {
+      var s = document.createElement("span");
+      s.className = "empty";
+      s.textContent = (opts && opts.empty) || "not published";
+      el.appendChild(s);
+      return;
+    }
+    if (opts && opts.href) {
+      var a = document.createElement("a");
+      a.href = opts.href;
+      a.textContent = value;
+      a.rel = "noopener";
+      el.appendChild(a);
+    } else {
+      el.textContent = value;
+    }
+  }
+
+  function loading(ids) {
+    ids.forEach(function (id) {
+      var el = $(id);
+      if (el) el.innerHTML = '<span class="skeleton"></span>';
+    });
+  }
+
+  var REG = ["r-name","r-range","r-cidr","r-type","r-registry","r-registered","r-changed"];
+  var GEO = ["g-org","g-asn","g-city","g-region","g-country","g-tz","g-coords"];
+  var ABU = ["a-name","a-email","a-phone"];
+
+  function message(title, detail) {
+    var box = $("message");
+    box.hidden = false;
+    box.className = "msg";
+    box.innerHTML = "";
+    var strong = document.createElement("strong");
+    strong.textContent = title;
+    box.appendChild(strong);
+    if (detail) {
+      var p = document.createElement("p");
+      p.textContent = detail;
+      box.appendChild(p);
+    }
+  }
+  function clearMessage() { $("message").hidden = true; }
+
+  function toast(text) {
+    var t = $("toast");
+    t.textContent = text;
+    t.classList.add("show");
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function () { t.classList.remove("show"); }, 1600);
+  }
+
+  function copy(text, label) {
+    if (!text) return;
+    var done = function () { toast(label + " copied"); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+  function fallbackCopy(text, done) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { toast("Copy failed — select the text instead"); }
+    document.body.removeChild(ta);
+  }
+
+  function date(value) {
+    if (!value) return "";
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    return d.toISOString().slice(0, 10);
+  }
+
+  /* ---------- validation ---------- */
+
+  var V4 = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+
+  function isIPv6(s) {
+    if (s.indexOf(":") === -1) return false;
+    if ((s.match(/::/g) || []).length > 1) return false;
+    var tail = "";
+    var parts = s.split(":");
+    var last = parts[parts.length - 1];
+    if (last.indexOf(".") !== -1) {
+      if (!V4.test(last)) return false;
+      tail = "0:0";
+      parts[parts.length - 1] = "0";
+      parts.push("0");
+      s = parts.join(":");
+    }
+    var halves = s.split("::");
+    if (halves.length > 2) return false;
+    var groups = [];
+    var ok = true;
+    halves.forEach(function (half) {
+      half.split(":").forEach(function (g) {
+        if (g === "") return;
+        if (!/^[0-9a-fA-F]{1,4}$/.test(g)) ok = false;
+        groups.push(g);
+      });
+    });
+    if (!ok) return false;
+    if (halves.length === 2) return groups.length <= 7 || (tail && groups.length <= 8);
+    return groups.length === 8;
+  }
+
+  function validate(s) {
+    s = s.trim().replace(/^\[|\]$/g, "");
+    if (!s) return null;
+    if (V4.test(s) || isIPv6(s)) return s;
+    return null;
+  }
+
+  /* ---------- RDAP ---------- */
+
+  function vcardValue(vcard, field) {
+    if (!Array.isArray(vcard) || vcard.length < 2 || !Array.isArray(vcard[1])) return "";
+    var found = "";
+    vcard[1].forEach(function (entry) {
+      if (!Array.isArray(entry) || entry[0] !== field || found) return;
+      var v = entry[3];
+      if (Array.isArray(v)) v = v.filter(Boolean).join(", ");
+      if (typeof v === "string") found = v;
+    });
+    return found;
+  }
+
+  function findEntity(entities, role, depth) {
+    depth = depth || 0;
+    if (!Array.isArray(entities) || depth > 4) return null;
+    for (var i = 0; i < entities.length; i++) {
+      var e = entities[i];
+      if (e && Array.isArray(e.roles) && e.roles.indexOf(role) !== -1) return e;
+      var nested = findEntity(e && e.entities, role, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  function eventDate(data, action) {
+    if (!data || !Array.isArray(data.events)) return "";
+    for (var i = 0; i < data.events.length; i++) {
+      if (data.events[i].eventAction === action) return data.events[i].eventDate;
+    }
+    return "";
+  }
+
+  function renderRDAP(data) {
+    raw.rdap = data;
+    set("r-name", data.name);
+    set("r-range", data.startAddress && data.endAddress ? data.startAddress + " – " + data.endAddress : "");
+    var cidr = "";
+    if (Array.isArray(data.cidr0_cidrs)) {
+      cidr = data.cidr0_cidrs.map(function (c) {
+        var base = c.v4prefix || c.v6prefix;
+        return base ? base + "/" + c.length : "";
+      }).filter(Boolean).join(", ");
+    }
+    set("r-cidr", cidr);
+    set("r-type", data.type);
+    set("r-registry", (data.port43 || "").replace(/^whois\./, "").toUpperCase() || (data.handle ? data.handle : ""));
+    set("r-registered", date(eventDate(data, "registration")));
+    set("r-changed", date(eventDate(data, "last changed")));
+
+    var abuse = findEntity(data.entities, "abuse");
+    var vcard = abuse && abuse.vcardArray;
+    var email = vcard ? vcardValue(vcard, "email") : "";
+    var phone = vcard ? vcardValue(vcard, "tel") : "";
+    var name = vcard ? vcardValue(vcard, "fn") : "";
+    set("a-name", name || (abuse && abuse.handle) || "");
+    set("a-email", email, email ? { href: "mailto:" + email } : null);
+    set("a-phone", phone);
+    updateRaw();
+  }
+
+  function rdapLookup(ip) {
+    loading(REG.concat(ABU));
+    var endpoints = [
+      "https://rdap.org/ip/" + encodeURIComponent(ip),
+      "https://rdap.arin.net/registry/ip/" + encodeURIComponent(ip)
+    ];
+    var attempt = function (i) {
+      if (i >= endpoints.length) {
+        REG.concat(ABU).forEach(function (id) { set(id, "", { empty: "unavailable" }); });
+        message("Registry lookup failed", "No RDAP server answered for " + ip + ". Try again in a moment.");
+        return;
+      }
+      fetch(endpoints[i], { headers: { "Accept": "application/rdap+json" } })
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(renderRDAP)
+        .catch(function () { attempt(i + 1); });
+    };
+    attempt(0);
+  }
+
+  /* ---------- geolocation ---------- */
+
+  function renderGeo(data) {
+    raw.geo = data;
+    var conn = data.connection || {};
+    set("g-org", conn.org || conn.isp || data.org || data.isp);
+    set("g-asn", conn.asn ? "AS" + conn.asn + (conn.domain ? " (" + conn.domain + ")" : "") : "");
+    set("g-city", data.city);
+    set("g-region", data.region || data.regionName);
+    set("g-country", data.country ? data.country + (data.country_code ? " (" + data.country_code + ")" : "") : "");
+    set("g-tz", (data.timezone && (data.timezone.id || data.timezone)) || "");
+    if (typeof data.latitude === "number" && typeof data.longitude === "number") {
+      var coords = data.latitude.toFixed(4) + ", " + data.longitude.toFixed(4);
+      set("g-coords", coords, { href: "https://www.openstreetmap.org/?mlat=" + data.latitude + "&mlon=" + data.longitude + "#map=10/" + data.latitude + "/" + data.longitude });
+    } else {
+      set("g-coords", "");
+    }
+    updateRaw();
+  }
+
+  function geoLookup(ip) {
+    loading(GEO);
+    var url = ip ? "https://ipwho.is/" + encodeURIComponent(ip) : "https://ipwho.is/";
+    return fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.success === false) throw new Error(data.message || "lookup failed");
+        renderGeo(data);
+        return data.ip;
+      })
+      .catch(function () {
+        GEO.forEach(function (id) { set(id, "", { empty: "unavailable" }); });
+        return null;
+      });
+  }
+
+  function updateRaw() {
+    $("raw").textContent = JSON.stringify(raw, null, 2);
+  }
+
+  /* ---------- flow ---------- */
+
+  function show(ip, isMine) {
+    current = ip;
+    clearMessage();
+    $("address").textContent = ip;
+    $("subject-label").textContent = isMine ? "Your IP address" : "Lookup";
+    document.title = ip + " — IP Toolkit";
+    var url = new URL(window.location.href);
+    if (isMine) { url.searchParams.delete("ip"); } else { url.searchParams.set("ip", ip); }
+    history.replaceState(null, "", url.toString().replace(/\?$/, ""));
+    geoLookup(ip);
+    rdapLookup(ip);
+  }
+
+  function loadMine() {
+    clearMessage();
+    $("query").value = "";
+    $("subject-label").textContent = "Your IP address";
+    $("address").innerHTML = '<span class="skeleton"></span>';
+    loading(REG.concat(GEO, ABU));
+    geoLookup(null).then(function (ip) {
+      if (!ip) {
+        $("address").textContent = "unavailable";
+        message("Could not detect your address", "The lookup service did not respond. Check your connection, or disable a blocker and reload.");
+        REG.concat(ABU).forEach(function (id) { set(id, "", { empty: "unavailable" }); });
+        return;
+      }
+      current = ip;
+      $("address").textContent = ip;
+      document.title = ip + " — IP Toolkit";
+      rdapLookup(ip);
+    });
+  }
+
+  /* ---------- events ---------- */
+
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var value = validate($("query").value);
+    if (!value) {
+      message("That is not a valid IP address", "Enter an IPv4 address like 8.8.8.8 or an IPv6 address like 2001:4860:4860::8888.");
+      return;
+    }
+    show(value, false);
+  });
+
+  $("mine").addEventListener("click", loadMine);
+  $("copy-ip").addEventListener("click", function () { copy(current, "Address"); });
+  $("copy-link").addEventListener("click", function () { copy(window.location.href, "Link"); });
+
+  /* ---------- start ---------- */
+
+  var initial = validate(new URLSearchParams(window.location.search).get("ip") || "");
+  if (initial) {
+    $("query").value = initial;
+    show(initial, false);
+  } else {
+    loadMine();
+  }
+})();
+</script>
+</body>
+</html>
